@@ -9,7 +9,14 @@ import {
   initialState as initialTodosState,
 } from '../../reducers/todos.reducer';
 
-function TodosPage({ logonState, urlBase, logoffError, handleLogoff, styles }) {
+function TodosPage({
+  logonState,
+  urlBase,
+  logoffError,
+  handleLogoff,
+  styles,
+  onUnauthorized,
+}) {
   const [sortDirection, setSortDirection] = useState('desc');
   const [sortField, setSortField] = useState('createdTime');
   const [queryString, setQueryString] = useState('');
@@ -42,14 +49,16 @@ function TodosPage({ logonState, urlBase, logoffError, handleLogoff, styles }) {
 
     try {
       dispatch({ type: todoActions.startRequest });
-      console.log("options", JSON.stringify(options))
-      console.log("payload", JSON.stringify(payload))
       const resp = await fetch(encodeUrl(), options);
+      if (resp.status === 401) {
+        // credential timed out
+        return onUnauthorized();
+      }
       if (!resp.ok) {
         throw new Error(resp.error);
       }
       const task = await resp.json();
-      const records = [{id: task.id, fields: task}]
+      const records = [{ id: task.id, fields: task }];
       delete records[0].fields.id;
       // const { records } = await resp.json();
       dispatch({ type: todoActions.addTodo, records });
@@ -83,7 +92,6 @@ function TodosPage({ logonState, urlBase, logoffError, handleLogoff, styles }) {
         title: editedTodo.title,
         createdTime: editedTodo.createdTime,
         isCompleted: editedTodo.isCompleted,
-
       };
       const options = {
         method: 'PATCH',
@@ -97,7 +105,10 @@ function TodosPage({ logonState, urlBase, logoffError, handleLogoff, styles }) {
       };
 
       // const resp = await fetch(encodeUrl(), options);
-      const resp = await fetch(`${urlBase}/tasks/${editedTodo.id}`, options)
+      const resp = await fetch(`${urlBase}/tasks/${editedTodo.id}`, options);
+      if (resp.status === 401) {
+        return onUnauthorized();
+      }
       if (!resp.ok) {
         throw new Error(resp.error);
       }
@@ -141,6 +152,9 @@ function TodosPage({ logonState, urlBase, logoffError, handleLogoff, styles }) {
         credentials: 'include',
       };
       const resp = await fetch(`${urlBase}/tasks/${id}`, options);
+      if (resp.status === 401) {
+        return onUnauthorized();
+      }
       if (!resp.ok) {
         throw new Error(resp.error);
       }
@@ -160,11 +174,11 @@ function TodosPage({ logonState, urlBase, logoffError, handleLogoff, styles }) {
     let searchQuery = '';
     // let sortQuery = `sort[0][field]=${sortField}&sort[0][direction]=${sortDirection}`;
     let orderby = sortField;
-    if (orderby == "createdTime") orderby = "creationDate"
-    const sortQuery=`sortBy=${orderby}&sortDirection=${sortDirection}`
+    if (orderby == 'createdTime') orderby = 'creationDate';
+    const sortQuery = `sortBy=${orderby}&sortDirection=${sortDirection}`;
     if (queryString) {
       // searchQuery = `&filterByFormula=SEARCH("${queryString}",+title)`;
-      searchQuery = `&find=${queryString}`
+      searchQuery = `&find=${queryString}`;
     }
     return encodeURI(`${url}?${sortQuery}${searchQuery}`);
   }, [queryString, sortField, sortDirection, urlBase]);
@@ -181,6 +195,9 @@ function TodosPage({ logonState, urlBase, logoffError, handleLogoff, styles }) {
       };
       try {
         const resp = await fetch(encodeUrl(), options);
+        if (resp.status === 401) {
+          return onUnauthorized();
+        }
         if (!resp.ok) {
           throw new Error(resp.message);
         }
@@ -190,18 +207,25 @@ function TodosPage({ logonState, urlBase, logoffError, handleLogoff, styles }) {
           const record = { id: task.id, fields: task };
           // delete record.fields.id;
           return record;
-        })
+        });
         dispatch({ type: todoActions.loadTodos, records });
       } catch (error) {
         dispatch({ type: todoActions.setLoadError, error });
       }
     };
     fetchTodos();
-  }, [urlBase, queryString, sortDirection, sortField, encodeUrl]);
+  }, [
+    urlBase,
+    queryString,
+    sortDirection,
+    sortField,
+    encodeUrl,
+    onUnauthorized,
+  ]);
 
   useEffect(() => {
     if (!logonState) navigate('/logonRegister');
-  }, [logonState]);
+  }, [logonState, navigate]);
 
   return (
     <>

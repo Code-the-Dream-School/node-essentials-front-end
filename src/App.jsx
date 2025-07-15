@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react';
-import {
-  useNavigate,
-  useLocation,
-  Routes,
-  Route,
-  Navigate,
-} from 'react-router-dom';
+import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import styles from './App.module.css';
 import './App.css';
-
 import TodosPage from './pages/TodosPage/TodosPage';
 import About from './pages/About/About';
 import Header from './shared/Header';
@@ -17,11 +10,36 @@ import NotFound from './pages/NotFound/NotFound';
 // const token = `Bearer ${import.meta.env.VITE_PAT}`;
 
 const urlBase = import.meta.env.VITE_BASE_URL;
-function AuthPage({ onLoginSuccess, logonState }) {
+let sessionFetchInProgress = false;
+function AuthPage({
+  logonState,
+  sessionState,
+  setSessionState,
+  setLogonState,
+  startLogonTimer,
+  fetchLogonState,
+}) {
+  const onLoginSuccess = (userName, csrfToken) => {
+    setLogonState({ userName, csrfToken });
+    setSessionState(3);
+  };
   const navigate = useNavigate();
-  const [view, setView] = useState('default');
+  let viewToShow = 'default';
+  if (sessionState === 0) {
+    viewToShow = 'checkLogon';
+    if (!sessionFetchInProgress) {
+      sessionFetchInProgress = true;
+      fetchLogonState();
+    }
+  }
+  const [view, setView] = useState(viewToShow);
   const [logonError, setLogonError] = useState(null);
   const [registerError, setRegisterError] = useState(null);
+  let timeoutNoticeValue = null;
+  if (sessionState === 1) {
+    timeoutNoticeValue = 'Your logon session has timed out.';
+  }
+  const [timeoutNotice, setTimeoutNotice] = useState(timeoutNoticeValue);
   const handleLogonSubmit = async (email, password) => {
     let res;
     let data;
@@ -39,7 +57,6 @@ function AuthPage({ onLoginSuccess, logonState }) {
       data = await res.json();
       if (res.status === 200 && data.name && data.csrfToken) {
         onLoginSuccess(data.name, data.csrfToken);
-        // navigate('/');
       } else {
         setLogonError('Authentication failed.');
       }
@@ -50,7 +67,6 @@ function AuthPage({ onLoginSuccess, logonState }) {
   const handleRegisterSubmit = async (name, email, password) => {
     let res;
     let data;
-    console.log(`${urlBase}/user/register`);
     try {
       res = await fetch(`${urlBase}/user/register`, {
         body: JSON.stringify({
@@ -70,25 +86,45 @@ function AuthPage({ onLoginSuccess, logonState }) {
       } else if (res.status === 400 && data.message) {
         setRegisterError(data.message);
       } else {
-        console.log(`Return from register call ${res.status}`);
         setRegisterError('unexpected response');
       }
     } catch (err) {
       setRegisterError(`Error on fetch: ${err.name} ${err.message}`);
     }
   };
+
   useEffect(() => {
-    if (logonState) {
+    if (logonState && logonState.userName && logonState.csrfToken) {
+      startLogonTimer();
       navigate('/');
+    } else if (sessionState === 1 || sessionState === 2) {
+      setView('default');
     }
-  }, [logonState, navigate]);
+  }, [logonState, sessionState, startLogonTimer]);
 
   return (
     <>
       {view === 'default' && (
         <>
-          <button onClick={() => setView('logon')}>Logon</button>
-          <button onClick={() => setView('register')}>Register</button>
+          <button
+            onClick={() => {
+              setTimeoutNotice(null);
+              setView('logon');
+            }}
+          >
+            Logon
+          </button>
+          <button
+            onClick={() => {
+              setTimeoutNotice(null);
+              setView('register');
+            }}
+          >
+            Register
+          </button>
+          <br></br>
+          <br></br>
+          {timeoutNotice && <p>{timeoutNotice}</p>}
         </>
       )}
       {view === 'logon' && (
@@ -159,112 +195,104 @@ function AuthPage({ onLoginSuccess, logonState }) {
           {registerError && <p>{registerError}</p>}
         </form>
       )}
-    </>
-  );
-}
-function LogonStatePage({
-  logonState,
-  setLogonState,
-  setStateInitialized,
-  stateInitialized,
-}) {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!stateInitialized) {
-      const fetchLogonState = async () => {
-        try {
-          const res = await fetch('/api/user/nameAndToken', {
-            method: 'GET',
-            credentials: 'include',
-          });
-
-          const data = res.status === 200 ? await res.json() : null;
-
-          if (data?.name && data?.csrfToken) {
-            setLogonState({ userName: data.name, csrfToken: data.csrfToken });
-          }
-        } catch (err) {
-          console.log("Fetch failed:", err.name, err.message);
-        } finally {
-          setStateInitialized(true); 
-        }
-      };
-
-      fetchLogonState();
-    }
-  }, [stateInitialized, setLogonState, setStateInitialized]);
-
-  useEffect(() => {
-    if (stateInitialized) {
-      if (logonState) {
-        navigate('/');
-      } else {
-        navigate('/logonRegister');
-      }
-    }
-  }, [stateInitialized, logonState, navigate]);
-
-  return (
-    <>
-      <p>Checking logon state...</p>
+      {view === 'checkingLogon' && <p>Checking logon state...</p>}
     </>
   );
 }
 
 function App() {
-  const [logonState, setLogonState] = useState(null);
+  const [logonState, setLogonState] = useState(null); // stores the userName and the csrfToken
   const [logoffError, setLogoffError] = useState(null);
-  const [stateInitialized, setStateInitialized] = useState(false);
-  const [title, setTitle] = useState('Todo List');
-  const location = useLocation();
-
-  useEffect(() => {
-    if (location.pathname === '/') {
-      setTitle('Todo List');
-    } else if (location.pathname === '/logonRegister') {
-      setTitle('Todo List Logon')
-    } else if (location.pathname === '/checkLogonState') {
-      setTitle('Todo List: Checking with the Server')
-    } else if (location.pathname === '/about') {
-      setTitle('About');
-    } else {
-      setTitle('Not Found');
+  const [sessionState, setSessionState] = useState(0);
+  const startLogonTimer = async () => {
+    while (sessionState === 3) {
+      // while logged on
+      let timeoutPromise = new Promise((resolve) => {
+        setTimeout(resolve, 5 * 60 * 1000); // Every 5 minutes
+      });
+      await timeoutPromise;
+      if (!sessionFetchInProgress) {
+        sessionFetchInProgress = true;
+        fetchLogonState();
+      }
     }
-  }, [location]);
-
-  const onLoginSuccess = (userName, csrfToken) => {
-    setLogonState(userName, csrfToken);
   };
-
-  const onLogoffSuccess = () => {
-    setLogonState(null);
-  };
-
-  const handleLogoff = async () => {
+  const fetchLogonState = async () => {
+    let resultSet = false;
     try {
-      const res = await fetch(`${urlBase}/user/logoff`, {
-        method: 'POST',
-        headers: {
-          'X-CSRF-TOKEN': logonState.csrfToken,
-        },
+      const res = await fetch('/api/user/nameAndToken', {
+        method: 'GET',
         credentials: 'include',
       });
 
-      if (res.status === 200 || res.status === 401) {
-        onLogoffSuccess();
-      } else {
-        const data = await res.json();
-        setLogoffError(data.message || 'Logoff failed');
+      const data = res.status === 200 ? await res.json() : null;
+
+      if (data?.name && data?.csrfToken) {
+        resultSet = true;
+        setSessionState(3);
+        setLogonState({ userName: data.name, csrfToken: data.csrfToken });
       }
-    } catch (err) {
-      setLogoffError(`Error on fetch: ${err.name} ${err.message}`);
+    } catch {
+      // console.log('Fetch failed:', err.name, err.message);
+    } finally {
+      if (!resultSet) {
+        // if we didn't get back good values
+        if (sessionState === 3) {
+          setSessionState(1); // must have timed out
+        } else if (sessionState === 0) {
+          // initial query
+          setSessionState(2);
+        }
+        if (logonState) {
+          setLogonState(null);
+        }
+      }
+      sessionFetchInProgress = false;
     }
+  };
+  // session state values:
+  // 0: unknown.  The user may or may not have a valid cookie
+  // 1: timed out.  The cookie is no longer valid
+  // 2: logged off.  The user is known to be logged off.  They either logged off intentionally or they never logged on.
+  // 3: logged on.  The user has a valid cookie, although it may have timed out recently.
+
+  const onLogoffSuccess = () => {
+    setLogonState(null);
+    setSessionState(2); // logged off
+  };
+
+  const handleLogoff = async () => {
+    if (logonState) {
+      try {
+        const res = await fetch(`${urlBase}/user/logoff`, {
+          method: 'POST',
+          headers: {
+            'X-CSRF-TOKEN': logonState.csrfToken,
+          },
+          credentials: 'include',
+        });
+
+        if (res.status === 200 || res.status === 401) {
+          onLogoffSuccess();
+        } else {
+          const data = await res.json();
+          setLogoffError(data.message || 'Logoff failed');
+        }
+      } catch (err) {
+        setLogoffError(`Error on fetch: ${err.name} ${err.message}`);
+      }
+    } else {
+      setSessionState(2);
+    }
+  };
+  const onUnauthorized = () => {
+    setSessionState(1); // the session probably timed out
+    setLogonState(null);
   };
 
   return (
     <div className={styles.wrapper}>
-      <Header title={title} />
+      <Header />
       <Routes>
         <Route
           path="/"
@@ -273,31 +301,27 @@ function App() {
               <TodosPage
                 urlBase={urlBase}
                 handleLogoff={handleLogoff}
-                logoffError={logoffError}
                 logonState={logonState}
                 styles={styles}
+                onUnauthorized={onUnauthorized}
+                logoffError={logoffError}
               />
             ) : (
-              
-              < Navigate to="/checkLogonState" />
+              <Navigate to="/logonRegister" />
             )
-          }
-        />
-        <Route
-          path="/checkLogonState"
-          element={
-            <LogonStatePage
-                stateInitialized={stateInitialized}
-                setStateInitialized={setStateInitialized}
-                setLogonState={setLogonState}
-                logonState={logonState}
-                />
           }
         />
         <Route
           path="/logonRegister"
           element={
-            <AuthPage onLoginSuccess={onLoginSuccess} logonState={logonState} />
+            <AuthPage
+              logonState={logonState}
+              sessionState={sessionState}
+              setLogonState={setLogonState}
+              setSessionState={setSessionState}
+              startLogonTimer={startLogonTimer}
+              fetchLogonState={fetchLogonState}
+            />
           }
         />
         <Route path="/about" element={<About />} />

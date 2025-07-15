@@ -55,6 +55,7 @@ function AuthPage({
         },
       });
       data = await res.json();
+      console.log("status and json", res.status, JSON.stringify(data))
       if (res.status === 200 && data.name && data.csrfToken) {
         onLoginSuccess(data.name, data.csrfToken);
       } else {

@@ -53,6 +53,7 @@ function AuthPage({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       });
       data = await res.json();
       console.log("status and json", res.status, JSON.stringify(data))
@@ -79,6 +80,7 @@ function AuthPage({
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       });
       data = await res.json();
       if (res.status === 201 && data.name && data.csrfToken) {

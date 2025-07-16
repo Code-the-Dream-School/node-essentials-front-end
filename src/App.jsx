@@ -10,36 +10,19 @@ import NotFound from './pages/NotFound/NotFound';
 // const token = `Bearer ${import.meta.env.VITE_PAT}`;
 
 const urlBase = import.meta.env.VITE_BASE_URL;
-let sessionFetchInProgress = false;
+
 function AuthPage({
   logonState,
-  sessionState,
-  setSessionState,
-  setLogonState,
-  startLogonTimer,
-  fetchLogonState,
+  establishLogonState,
+  timeoutNotice,
+  setTimeoutNotice
 }) {
-  const onLoginSuccess = (userName, csrfToken) => {
-    setLogonState({ userName, csrfToken });
-    setSessionState(3);
-  };
+
   const navigate = useNavigate();
-  let viewToShow = 'default';
-  if (sessionState === 0) {
-    viewToShow = 'checkLogon';
-    if (!sessionFetchInProgress) {
-      sessionFetchInProgress = true;
-      fetchLogonState();
-    }
-  }
-  const [view, setView] = useState(viewToShow);
+  const [view, setView] = useState('default');
   const [logonError, setLogonError] = useState(null);
   const [registerError, setRegisterError] = useState(null);
-  let timeoutNoticeValue = null;
-  if (sessionState === 1) {
-    timeoutNoticeValue = 'Your logon session has timed out.';
-  }
-  const [timeoutNotice, setTimeoutNotice] = useState(timeoutNoticeValue);
+
   const handleLogonSubmit = async (email, password) => {
     let res;
     let data;
@@ -58,7 +41,7 @@ function AuthPage({
       data = await res.json();
       console.log("status and json", res.status, JSON.stringify(data))
       if (res.status === 200 && data.name && data.csrfToken) {
-        onLoginSuccess(data.name, data.csrfToken);
+        establishLogonState(data.name, data.csrfToken);
       } else {
         setLogonError('Authentication failed.');
       }
@@ -84,7 +67,7 @@ function AuthPage({
       });
       data = await res.json();
       if (res.status === 201 && data.name && data.csrfToken) {
-        onLoginSuccess(data.name, data.csrfToken);
+        establishLogonState(data.name, data.csrfToken);
         // navigate('/');
       } else if (res.status === 400 && data.message) {
         setRegisterError(data.message);
@@ -97,13 +80,10 @@ function AuthPage({
   };
 
   useEffect(() => {
-    if (logonState && logonState.userName && logonState.csrfToken) {
-      startLogonTimer();
+    if (logonState) {
       navigate('/');
-    } else if (sessionState === 1 || sessionState === 2) {
-      setView('default');
-    }
-  }, [logonState, sessionState, startLogonTimer]);
+    } 
+  }, [logonState]);
 
   return (
     <>
@@ -198,71 +178,32 @@ function AuthPage({
           {registerError && <p>{registerError}</p>}
         </form>
       )}
-      {view === 'checkingLogon' && <p>Checking logon state...</p>}
     </>
   );
 }
 
 function App() {
-  const [logonState, setLogonState] = useState(null); // stores the userName and the csrfToken
+   // stores the userName and the csrfToken
   const [logoffError, setLogoffError] = useState(null);
-  const [sessionState, setSessionState] = useState(0);
-  const startLogonTimer = async () => {
-    while (sessionState === 3) {
-      // while logged on
-      let timeoutPromise = new Promise((resolve) => {
-        setTimeout(resolve, 5 * 60 * 1000); // Every 5 minutes
-      });
-      await timeoutPromise;
-      if (!sessionFetchInProgress) {
-        sessionFetchInProgress = true;
-        fetchLogonState();
-      }
-    }
-  };
-  const fetchLogonState = async () => {
-    let resultSet = false;
-    try {
-      const res = await fetch('/api/user/nameAndToken', {
-        method: 'GET',
-        credentials: 'include',
-      });
+  const [timeoutNotice, setTimeoutNotice] = useState(null);
+  const currentUserName = localStorage.getItem("userName");
+  const currentCsrfToken = localStorage.getItem("csrfToken");
+  let initialLogonState = null;
+  if (currentUserName && currentCsrfToken) {
+    initialLogonState = {userName: currentUserName, csrfToken: currentCsrfToken}
+  }
+  const [logonState, setLogonState] = useState(initialLogonState);
 
-      const data = res.status === 200 ? await res.json() : null;
-
-      if (data?.name && data?.csrfToken) {
-        resultSet = true;
-        setSessionState(3);
-        setLogonState({ userName: data.name, csrfToken: data.csrfToken });
-      }
-    } catch {
-      // console.log('Fetch failed:', err.name, err.message);
-    } finally {
-      if (!resultSet) {
-        // if we didn't get back good values
-        if (sessionState === 3) {
-          setSessionState(1); // must have timed out
-        } else if (sessionState === 0) {
-          // initial query
-          setSessionState(2);
-        }
-        if (logonState) {
-          setLogonState(null);
-        }
-      }
-      sessionFetchInProgress = false;
-    }
-  };
-  // session state values:
-  // 0: unknown.  The user may or may not have a valid cookie
-  // 1: timed out.  The cookie is no longer valid
-  // 2: logged off.  The user is known to be logged off.  They either logged off intentionally or they never logged on.
-  // 3: logged on.  The user has a valid cookie, although it may have timed out recently.
-
-  const onLogoffSuccess = () => {
+  const establishLogonState = (userName, csrfToken) => {
+    localStorage.setItem("userName", userName);
+    localStorage.setItem("csrfToken", csrfToken);
+    setLogonState({userName, csrfToken})
+  }
+  const clearLogonState = () => { 
+    localStorage.removeItem("userName");
+    localStorage.removeItem("csrfToken");
     setLogonState(null);
-    setSessionState(2); // logged off
-  };
+  } 
 
   const handleLogoff = async () => {
     if (logonState) {
@@ -276,7 +217,7 @@ function App() {
         });
 
         if (res.status === 200 || res.status === 401) {
-          onLogoffSuccess();
+          clearLogonState();
         } else {
           const data = await res.json();
           setLogoffError(data.message || 'Logoff failed');
@@ -284,13 +225,11 @@ function App() {
       } catch (err) {
         setLogoffError(`Error on fetch: ${err.name} ${err.message}`);
       }
-    } else {
-      setSessionState(2);
     }
   };
   const onUnauthorized = () => {
-    setSessionState(1); // the session probably timed out
-    setLogonState(null);
+    setTimeoutNotice("Your session has timed out.")
+    clearLogonState(); // this triggers the Todo page to navigate back to /logonRegister
   };
 
   return (
@@ -305,7 +244,6 @@ function App() {
                 urlBase={urlBase}
                 handleLogoff={handleLogoff}
                 logonState={logonState}
-                styles={styles}
                 onUnauthorized={onUnauthorized}
                 logoffError={logoffError}
               />
@@ -319,11 +257,9 @@ function App() {
           element={
             <AuthPage
               logonState={logonState}
-              sessionState={sessionState}
-              setLogonState={setLogonState}
-              setSessionState={setSessionState}
-              startLogonTimer={startLogonTimer}
-              fetchLogonState={fetchLogonState}
+              establishLogonState={establishLogonState}
+              timeoutNotice={timeoutNotice}
+              setTimeoutNotice={setTimeoutNotice}
             />
           }
         />

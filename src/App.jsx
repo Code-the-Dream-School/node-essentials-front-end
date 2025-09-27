@@ -1,225 +1,271 @@
-import { useCallback, useEffect, useReducer, useState } from 'react';
-import { Routes, Route, useLocation } from 'react-router';
+import { useState, useEffect } from 'react';
+import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import styles from './App.module.css';
 import './App.css';
-import {
-  reducer as todosReducer,
-  actions as todoActions,
-  initialState as initialTodosState,
-} from './reducers/todos.reducer';
 import TodosPage from './pages/TodosPage/TodosPage';
 import About from './pages/About/About';
 import Header from './shared/Header';
 import NotFound from './pages/NotFound/NotFound';
 
-const token = `Bearer ${import.meta.env.VITE_PAT}`;
+// const token = `Bearer ${import.meta.env.VITE_PAT}`;
+
+const urlBase = import.meta.env.VITE_BASE_URL;
+
+function AuthPage({
+  logonState,
+  establishLogonState,
+  timeoutNotice,
+  setTimeoutNotice
+}) {
+
+  const navigate = useNavigate();
+  const [view, setView] = useState('default');
+  const [logonError, setLogonError] = useState(null);
+  const [registerError, setRegisterError] = useState(null);
+
+  const handleLogonSubmit = async (email, password) => {
+    let res;
+    let data;
+    try {
+      res = await fetch(`${urlBase}/user/logon`, {
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      data = await res.json();
+      console.log("status and json", res.status, JSON.stringify(data))
+      if (res.status === 200 && data.name && data.csrfToken) {
+        establishLogonState(data.name, data.csrfToken);
+      } else {
+        setLogonError('Authentication failed.');
+      }
+    } catch (err) {
+      setLogonError(`Error on fetch: ${err.name} ${err.message}`);
+    }
+  };
+  const handleRegisterSubmit = async (name, email, password) => {
+    let res;
+    let data;
+    try {
+      res = await fetch(`${urlBase}/user/register`, {
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+        }),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      data = await res.json();
+      if (res.status === 201 && data.name && data.csrfToken) {
+        establishLogonState(data.name, data.csrfToken);
+        // navigate('/');
+      } else if (res.status === 400 && data.message) {
+        setRegisterError(data.message);
+      } else {
+        setRegisterError('unexpected response');
+      }
+    } catch (err) {
+      setRegisterError(`Error on fetch: ${err.name} ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    if (logonState) {
+      navigate('/');
+    } 
+  }, [logonState]);
+
+  return (
+    <>
+      {view === 'default' && (
+        <>
+          <button
+            onClick={() => {
+              setTimeoutNotice(null);
+              setView('logon');
+            }}
+          >
+            Logon
+          </button>
+          <button
+            onClick={() => {
+              setTimeoutNotice(null);
+              setView('register');
+            }}
+          >
+            Register
+          </button>
+          <br></br>
+          <br></br>
+          {timeoutNotice && <p>{timeoutNotice}</p>}
+        </>
+      )}
+      {view === 'logon' && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const values = e.target.elements;
+            handleLogonSubmit(values.email.value, values.password.value);
+          }}
+        >
+          <p>Log On:</p>
+          <label htmlFor="email">Email: </label>
+          <input name="email" placeholder="Email" />
+          <br></br>
+          <label htmlFor="password3">Password: </label>
+          <input id="password3" name="password" type="password" />
+          <br></br>
+          <button type="submit">Submit</button>
+          <button
+            type="button"
+            onClick={() => {
+              setLogonError(null);
+              setView('default');
+            }}
+          >
+            Cancel
+          </button>
+          {logonError && <p>{logonError}</p>}
+        </form>
+      )}
+      {view === 'register' && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const values = e.target.elements;
+            if (values.password.value != values.passwordConfirmation.value) {
+              setRegisterError("The passwords entered didn't match.");
+              return;
+            }
+            handleRegisterSubmit(
+              values.name.value,
+              values.email.value,
+              values.password.value
+            );
+          }}
+        >
+          <p>Register as a New User:</p>
+          <label htmlFor="name">Your Name: </label>
+          <input name="name" id="name" placeholder="Name" />
+          <br></br>
+          <label htmlFor="email">Your Email: </label>
+          <input id="email" name="email" placeholder="Email" />
+          <br></br>
+          <label htmlFor="password1">Your New Password: </label>
+          <input id="password1" name="password" type="password" />
+          <label htmlFor="password2">Confirm Your Password: </label>
+          <input id="password2" name="passwordConfirmation" type="password" />
+          <button type="submit">Submit</button>
+          <button
+            type="button"
+            onClick={() => {
+              setRegisterError(null);
+              setView('default');
+            }}
+          >
+            Cancel
+          </button>
+          {registerError && <p>{registerError}</p>}
+        </form>
+      )}
+    </>
+  );
+}
 
 function App() {
-  const [sortDirection, setSortDirection] = useState('desc');
-  const [sortField, setSortField] = useState('createdTime');
-  const [queryString, setQueryString] = useState('');
-  const [todoState, dispatch] = useReducer(todosReducer, initialTodosState);
-  const [title, setTitle] = useState('Todo List');
-  const location = useLocation();
+   // stores the userName and the csrfToken
+  const [logoffError, setLogoffError] = useState(null);
+  const [timeoutNotice, setTimeoutNotice] = useState(null);
+  const currentUserName = localStorage.getItem("userName");
+  const currentCsrfToken = localStorage.getItem("csrfToken");
+  let initialLogonState = null;
+  if (currentUserName && currentCsrfToken) {
+    initialLogonState = {userName: currentUserName, csrfToken: currentCsrfToken}
+  }
+  const [logonState, setLogonState] = useState(initialLogonState);
 
-  //Airtable-specific URL with params
-  const encodeUrl = useCallback(() => {
-    const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
-    let searchQuery = '';
-    let sortQuery = `sort[0][field]=${sortField}&sort[0][direction]=${sortDirection}`;
-    if (queryString) {
-      searchQuery = `&filterByFormula=SEARCH("${queryString}",+title)`;
-    }
-    return encodeURI(`${url}?${sortQuery}${searchQuery}`);
-  }, [queryString, sortField, sortDirection]);
+  const establishLogonState = (userName, csrfToken) => {
+    localStorage.setItem("userName", userName);
+    localStorage.setItem("csrfToken", csrfToken);
+    setLogonState({userName, csrfToken})
+  }
+  const clearLogonState = () => { 
+    localStorage.removeItem("userName");
+    localStorage.removeItem("csrfToken");
+    setLogonState(null);
+  } 
 
-  useEffect(() => {
-    const fetchTodos = async () => {
-      dispatch({ type: todoActions.fetchTodos });
-      const options = {
-        method: 'GET',
-        headers: {
-          Authorization: token,
-        },
-      };
+  const handleLogoff = async () => {
+    if (logonState) {
       try {
-        const resp = await fetch(encodeUrl(), options);
-        if (!resp.ok) {
-          throw new Error(resp.message);
+        const res = await fetch(`${urlBase}/user/logoff`, {
+          method: 'POST',
+          headers: {
+            'X-CSRF-TOKEN': logonState.csrfToken,
+          },
+          credentials: 'include',
+        });
+
+        if (res.status === 200 || res.status === 401) {
+          clearLogonState();
+        } else {
+          const data = await res.json();
+          setLogoffError(data.message || 'Logoff failed');
         }
-        const { records } = await resp.json();
-        dispatch({ type: todoActions.loadTodos, records });
-      } catch (error) {
-        dispatch({ type: todoActions.setLoadError, error });
+      } catch (err) {
+        setLogoffError(`Error on fetch: ${err.name} ${err.message}`);
       }
-    };
-    fetchTodos();
-  }, [queryString, sortDirection, sortField, encodeUrl]);
-
-  useEffect(() => {
-    if (location.pathname === '/') {
-      setTitle('Todo List');
-    } else if (location.pathname === '/about') {
-      setTitle('About');
-    } else {
-      setTitle('Not Found');
-    }
-  }, [location]);
-  //pessimistic
-  const addTodo = async (newTodo) => {
-    const payload = {
-      records: [
-        {
-          fields: {
-            title: newTodo.title,
-            isCompleted: newTodo.isCompleted,
-          },
-        },
-      ],
-    };
-    const options = {
-      method: 'POST',
-      headers: {
-        Authorization: token,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    };
-
-    try {
-      dispatch({ type: todoActions.startRequest });
-      const resp = await fetch(encodeUrl(), options);
-      if (!resp.ok) {
-        throw new Error(resp.error);
-      }
-      const { records } = await resp.json();
-      dispatch({ type: todoActions.addTodo, records });
-    } catch (error) {
-      dispatch({ type: todoActions.setLoadError, error });
-    } finally {
-      dispatch({ type: todoActions.endRequest });
     }
   };
-
-  //optimistic - uses catch to revert
-  const updateTodo = async (editedTodo) => {
-    const originalTodo = todoState.todoList.find(
-      (todo) => todo.id === editedTodo.id
-    );
-    dispatch({ type: todoActions.updateTodo, editedTodo });
-
-    try {
-      const payload = {
-        records: [
-          {
-            id: editedTodo.id,
-            fields: {
-              //explicitly only want these fields
-              title: editedTodo.title,
-              createdTime: editedTodo.createdTime,
-              isCompleted: editedTodo.isCompleted,
-            },
-          },
-        ],
-      };
-      const options = {
-        method: 'PATCH',
-        headers: {
-          Authorization: token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      };
-
-      const resp = await fetch(encodeUrl(), options);
-      if (!resp.ok) {
-        throw new Error(resp.error);
-      }
-    } catch (error) {
-      dispatch({
-        type: todoActions.revertTodo,
-        editedTodo: originalTodo,
-        error,
-      });
-    } finally {
-      dispatch({ type: todoActions.endRequest });
-    }
-  };
-
-  //optimistic - uses catch to revert
-  const completeTodo = async (id) => {
-    const [originalTodo] = todoState.todoList.filter((todo) => todo.id === id);
-
-    dispatch({ type: todoActions.completeTodo, id });
-
-    try {
-      const payload = {
-        records: [
-          {
-            id: id,
-            fields: {
-              isCompleted: true,
-            },
-          },
-        ],
-      };
-      const options = {
-        method: 'PATCH',
-        headers: {
-          Authorization: token,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      };
-      const resp = await fetch(encodeUrl(), options);
-      if (!resp.ok) {
-        throw new Error(resp.error);
-      }
-    } catch (error) {
-      dispatch({
-        type: todoActions.revertTodo,
-        editedTodo: originalTodo,
-        error: { message: `${error.message}. Reverting todo...` },
-      });
-    }
+  const onUnauthorized = () => {
+    setTimeoutNotice("Your session has timed out.")
+    clearLogonState(); // this triggers the Todo page to navigate back to /logonRegister
   };
 
   return (
     <div className={styles.wrapper}>
-      <Header title={title} />
+      <Header />
       <Routes>
         <Route
           path="/"
           element={
-            <TodosPage
-              addTodo={addTodo}
-              todoState={todoState}
-              completeTodo={completeTodo}
-              updateTodo={updateTodo}
-              queryString={queryString}
-              setQueryString={setQueryString}
-              sortDirection={sortDirection}
-              setSortDirection={setSortDirection}
-              sortField={sortField}
-              setSortField={setSortField}
+            logonState ? (
+              <TodosPage
+                urlBase={urlBase}
+                handleLogoff={handleLogoff}
+                logonState={logonState}
+                onUnauthorized={onUnauthorized}
+                logoffError={logoffError}
+              />
+            ) : (
+              <Navigate to="/logonRegister" />
+            )
+          }
+        />
+        <Route
+          path="/logonRegister"
+          element={
+            <AuthPage
+              logonState={logonState}
+              establishLogonState={establishLogonState}
+              timeoutNotice={timeoutNotice}
+              setTimeoutNotice={setTimeoutNotice}
             />
           }
         />
         <Route path="/about" element={<About />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      {todoState.errorMessage && (
-        <div className={styles.errorWrapper}>
-          <hr />
-          <p className={styles.errorMessage}>{todoState.errorMessage}</p>
-          <button
-            type="button"
-            onClick={() => dispatch({ type: todoActions.clearError })}
-          >
-            Dismiss Error Message
-          </button>
-        </div>
-      )}
     </div>
   );
 }

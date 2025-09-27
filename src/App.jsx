@@ -53,7 +53,7 @@ function AuthPage({
     let res;
     let data;
     try {
-      res = await fetch(`${urlBase}/user/register`, {
+      res = await fetch(`${urlBase}/user`, {
         body: JSON.stringify({
           name,
           email,

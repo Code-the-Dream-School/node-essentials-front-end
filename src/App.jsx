@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Routes, Route, Navigate } from 'react-router-dom';
+import { useGoogleLogin  } from '@react-oauth/google';
 import styles from './App.module.css';
 import './App.css';
 import TodosPage from './pages/TodosPage/TodosPage';
@@ -79,6 +80,27 @@ function AuthPage({
     }
   };
 
+  const handleGoogleLogon = useGoogleLogin({
+    onSuccess: async (codeResponse) => {
+      console.log(codeResponse)
+      await fetch(`${urlBase}/user/googleLogon`, {
+        body: JSON.stringify({
+          code: codeResponse.code
+        }),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+    },
+    onError: async (googleError) => {
+      console.log(googleError);
+    },
+    flow: 'auth-code',
+    scope: 'openid email profile',
+  });
+
   useEffect(() => {
     if (logonState) {
       navigate('/');
@@ -104,6 +126,12 @@ function AuthPage({
             }}
           >
             Register
+          </button>
+          <br></br>
+          <button
+            onClick={handleGoogleLogon}
+          >
+            Logon with Google
           </button>
           <br></br>
           <br></br>

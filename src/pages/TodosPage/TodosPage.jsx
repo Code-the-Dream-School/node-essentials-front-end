@@ -28,15 +28,6 @@ function TodosPage({
   const [todoState, dispatch] = useReducer(todosReducer, initialTodosState);
   const {dispatch: dispatchUser} = useContext(userContext);
 
-  const onUnauthorized = () => {
-    dispatchUser({
-      type: userActions.setAuthError,
-      error: 'Your session has timed out.'
-    });
-    dispatchUser({ type: userActions.clearUser });
-    navigate('/');
-  };
-
   //pessimistic
   const addTodo = async (newTodo) => {
     const payload = {
@@ -182,6 +173,15 @@ function TodosPage({
     }
   };
 
+  const onUnauthorized = useCallback(() => {
+    dispatchUser({
+      type: userActions.setAuthError,
+      error: 'Your session has timed out.'
+    });
+    dispatchUser({ type: userActions.clearUser });
+    navigate('/');
+  }, [dispatchUser, navigate]);
+
   //Airtable-specific URL with params
   const encodeUrl = useCallback(() => {
     // const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
@@ -235,6 +235,7 @@ function TodosPage({
     sortDirection,
     sortField,
     encodeUrl,
+    onUnauthorized
   ]);
 
   return (

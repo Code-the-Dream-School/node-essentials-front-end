@@ -1,27 +1,42 @@
-import { useCallback, useEffect, useReducer, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {useCallback, useContext, useEffect, useReducer, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import TodoForm from '../../features/TodoForm';
 import TodoList from '../../features/TodoList/TodoList';
 import TodosViewForm from '../../features/TodosViewForm';
+import {
+  actions as userActions,
+  context as userContext
+} from '../../reducers/user.reducer.js';
 import {
   reducer as todosReducer,
   actions as todoActions,
   initialState as initialTodosState,
 } from '../../reducers/todos.reducer';
+import styles from '../../App.module.css';
 
 function TodosPage({
   logonState,
   urlBase,
   logoffError,
   handleLogoff,
-  styles,
-  onUnauthorized,
 }) {
+  const navigate = useNavigate();
+
   const [sortDirection, setSortDirection] = useState('desc');
   const [sortField, setSortField] = useState('createdTime');
   const [queryString, setQueryString] = useState('');
   const [todoState, dispatch] = useReducer(todosReducer, initialTodosState);
-  const navigate = useNavigate();
+  const {dispatch: dispatchUser} = useContext(userContext);
+
+  const onUnauthorized = () => {
+    dispatchUser({
+      type: userActions.setAuthError,
+      error: 'Your session has timed out.'
+    });
+    dispatchUser({ type: userActions.clearUser });
+    navigate('/');
+  };
+
   //pessimistic
   const addTodo = async (newTodo) => {
     const payload = {
@@ -220,16 +235,11 @@ function TodosPage({
     sortDirection,
     sortField,
     encodeUrl,
-    onUnauthorized,
   ]);
-
-  useEffect(() => {
-    if (!logonState) navigate('/logonRegister');
-  }, [logonState, navigate]);
 
   return (
     <>
-      <p>{logonState.userName} is logged on.</p>
+      <p>{logonState.name} is logged on.</p>
       <button onClick={handleLogoff}>Logoff</button>
       {logoffError && <p>{logoffError}</p>}
       <hr />
@@ -253,7 +263,7 @@ function TodosPage({
       {todoState.errorMessage && (
         <div className={styles.errorWrapper}>
           <hr />
-          <p className={styles.errorMessage}>{todoState.errorMessage}</p>
+          <p>{todoState.errorMessage}</p>
           <button
             type="button"
             onClick={() => dispatch({ type: todoActions.clearError })}

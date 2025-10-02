@@ -9,10 +9,10 @@ function Header() {
   useEffect(() => {
     if (location.pathname === '/') {
       setTitle('Todo List');
-    } else if (location.pathname === '/logonRegister') {
+    } else if (location.pathname === '/logon') {
       setTitle('Todo List Logon');
-    } else if (location.pathname === '/checkLogonState') {
-      setTitle('Todo List: Checking with the Server');
+    } else if (location.pathname === '/register') {
+      setTitle('Todo List Register');
     } else if (location.pathname === '/about') {
       setTitle('About');
     } else {

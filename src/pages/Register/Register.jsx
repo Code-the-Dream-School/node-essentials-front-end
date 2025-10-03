@@ -1,4 +1,4 @@
-import {useContext, useState} from 'react';
+import {useContext, useState, useEffect} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {
   actions as userActions,
@@ -47,9 +47,12 @@ function Register() {
     dispatch({type: userActions.setAuthError, error: error});
   };
 
-  const clearError = () => {
-    dispatch({type: userActions.clearAuthError});
-  };
+  useEffect(() => {
+    return () => {
+      // clear auth error on component destruction (page changed)
+      dispatch({type: userActions.clearAuthError});
+    };
+  }, [dispatch]);
 
   return (
     <>
@@ -98,7 +101,6 @@ function Register() {
           <button
             type="button"
             onClick={() => {
-              clearError();
               navigate('/');
             }}
           >

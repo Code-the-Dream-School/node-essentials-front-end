@@ -1,4 +1,4 @@
-import {useContext} from 'react';
+import {useContext, useEffect, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {
   actions as userActions,
@@ -10,6 +10,8 @@ const urlBase = import.meta.env.VITE_BASE_URL;
 function Logon() {
   const navigate = useNavigate();
   const {dispatch, userState} = useContext(UserContext);
+
+  const [userEmail, setUserEmail] = useState('');
 
   const handleLogonSubmit = async (email, password) => {
     try {
@@ -41,9 +43,12 @@ function Logon() {
     dispatch({type: userActions.setAuthError, error: error});
   };
 
-  const clearError = () => {
-    dispatch({type: userActions.clearAuthError});
-  };
+  useEffect(() => {
+    return () => {
+      // clear auth error on component destruction (page changed)
+      dispatch({type: userActions.clearAuthError});
+    };
+  }, [dispatch]);
 
   return (
     <>
@@ -57,7 +62,12 @@ function Logon() {
         >
           <p>Log On:</p>
           <label htmlFor="email">Email: </label>
-          <input name="email" placeholder="Email"/>
+          <input
+            name="email"
+            placeholder="Email"
+            value={userEmail}
+            onChange={(e) => {setUserEmail(e.target.value);}}
+          />
           <br></br>
           <label htmlFor="password3">Password: </label>
           <input id="password3" name="password" type="password"/>
@@ -66,7 +76,6 @@ function Logon() {
           <button
             type="button"
             onClick={() => {
-              clearError();
               navigate('/');
             }}
           >

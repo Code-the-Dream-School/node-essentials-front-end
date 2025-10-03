@@ -1,11 +1,12 @@
 import {useCallback, useContext, useEffect, useReducer, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
+import AuthLogoff from '../../features/AuthLogoff/AuthLogoff';
 import TodoForm from '../../features/TodoForm';
 import TodoList from '../../features/TodoList/TodoList';
 import TodosViewForm from '../../features/TodosViewForm';
 import {
   actions as userActions,
-  context as userContext
+  context as UserContext
 } from '../../reducers/user.reducer.js';
 import {
   reducer as todosReducer,
@@ -14,19 +15,16 @@ import {
 } from '../../reducers/todos.reducer';
 import styles from '../../App.module.css';
 
-function TodosPage({
-  logonState,
-  urlBase,
-  logoffError,
-  handleLogoff,
-}) {
+const urlBase = import.meta.env.VITE_BASE_URL;
+
+function TodosPage() {
   const navigate = useNavigate();
 
   const [sortDirection, setSortDirection] = useState('desc');
   const [sortField, setSortField] = useState('createdTime');
   const [queryString, setQueryString] = useState('');
   const [todoState, dispatch] = useReducer(todosReducer, initialTodosState);
-  const {dispatch: dispatchUser} = useContext(userContext);
+  const {userState, dispatch: dispatchUser} = useContext(UserContext);
 
   //pessimistic
   const addTodo = async (newTodo) => {
@@ -47,7 +45,7 @@ function TodosPage({
       headers: {
         // Authorization: token,
         'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': logonState.csrfToken,
+        'X-CSRF-TOKEN': userState?.userData?.csrfToken,
       },
       body: JSON.stringify(payload),
       credentials: 'include',
@@ -104,7 +102,7 @@ function TodosPage({
         headers: {
           // Authorization: token,
           'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': logonState.csrfToken,
+          'X-CSRF-TOKEN': userState?.userData?.csrfToken,
         },
         body: JSON.stringify(payload),
         credentials: 'include',
@@ -152,7 +150,7 @@ function TodosPage({
         headers: {
           // Authorization: token,
           'Content-Type': 'application/json',
-          'X-CSRF-Token': logonState.csrfToken,
+          'X-CSRF-Token': userState?.userData?.csrfToken,
         },
         body: JSON.stringify(payload),
         credentials: 'include',
@@ -196,7 +194,7 @@ function TodosPage({
       searchQuery = `&find=${queryString}`;
     }
     return encodeURI(`${url}?${sortQuery}${searchQuery}`);
-  }, [queryString, sortField, sortDirection, urlBase]);
+  }, [queryString, sortField, sortDirection]);
 
   useEffect(() => {
     const fetchTodos = async () => {
@@ -230,7 +228,6 @@ function TodosPage({
     };
     fetchTodos();
   }, [
-    urlBase,
     queryString,
     sortDirection,
     sortField,
@@ -240,9 +237,7 @@ function TodosPage({
 
   return (
     <>
-      <p>{logonState.name} is logged on.</p>
-      <button onClick={handleLogoff}>Logoff</button>
-      {logoffError && <p>{logoffError}</p>}
+      <AuthLogoff />
       <hr />
       <TodoForm onAddTodo={addTodo} isSaving={todoState.isSaving} />
 

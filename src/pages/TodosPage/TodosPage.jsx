@@ -1,27 +1,31 @@
-import { useCallback, useEffect, useReducer, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {useCallback, useContext, useEffect, useReducer, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
+import AuthLogoff from '../../features/AuthLogoff/AuthLogoff';
 import TodoForm from '../../features/TodoForm';
 import TodoList from '../../features/TodoList/TodoList';
 import TodosViewForm from '../../features/TodosViewForm';
+import {
+  actions as userActions,
+  context as UserContext
+} from '../../reducers/user.reducer.js';
 import {
   reducer as todosReducer,
   actions as todoActions,
   initialState as initialTodosState,
 } from '../../reducers/todos.reducer';
+import styles from '../../App.module.css';
 
-function TodosPage({
-  logonState,
-  urlBase,
-  logoffError,
-  handleLogoff,
-  styles,
-  onUnauthorized,
-}) {
+const urlBase = import.meta.env.VITE_BASE_URL;
+
+function TodosPage() {
+  const navigate = useNavigate();
+
   const [sortDirection, setSortDirection] = useState('desc');
   const [sortField, setSortField] = useState('createdTime');
   const [queryString, setQueryString] = useState('');
   const [todoState, dispatch] = useReducer(todosReducer, initialTodosState);
-  const navigate = useNavigate();
+  const {userState, dispatch: dispatchUser} = useContext(UserContext);
+
   //pessimistic
   const addTodo = async (newTodo) => {
     const payload = {
@@ -41,7 +45,7 @@ function TodosPage({
       headers: {
         // Authorization: token,
         'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': logonState.csrfToken,
+        'X-CSRF-TOKEN': userState?.userData?.csrfToken,
       },
       body: JSON.stringify(payload),
       credentials: 'include',
@@ -98,7 +102,7 @@ function TodosPage({
         headers: {
           // Authorization: token,
           'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': logonState.csrfToken,
+          'X-CSRF-TOKEN': userState?.userData?.csrfToken,
         },
         body: JSON.stringify(payload),
         credentials: 'include',
@@ -146,7 +150,7 @@ function TodosPage({
         headers: {
           // Authorization: token,
           'Content-Type': 'application/json',
-          'X-CSRF-Token': logonState.csrfToken,
+          'X-CSRF-Token': userState?.userData?.csrfToken,
         },
         body: JSON.stringify(payload),
         credentials: 'include',
@@ -167,6 +171,15 @@ function TodosPage({
     }
   };
 
+  const onUnauthorized = useCallback(() => {
+    dispatchUser({
+      type: userActions.setAuthError,
+      error: 'Your session has timed out.'
+    });
+    dispatchUser({ type: userActions.clearUser });
+    navigate('/');
+  }, [dispatchUser, navigate]);
+
   //Airtable-specific URL with params
   const encodeUrl = useCallback(() => {
     // const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
@@ -181,7 +194,7 @@ function TodosPage({
       searchQuery = `&find=${queryString}`;
     }
     return encodeURI(`${url}?${sortQuery}${searchQuery}`);
-  }, [queryString, sortField, sortDirection, urlBase]);
+  }, [queryString, sortField, sortDirection]);
 
   useEffect(() => {
     const fetchTodos = async () => {
@@ -215,23 +228,16 @@ function TodosPage({
     };
     fetchTodos();
   }, [
-    urlBase,
     queryString,
     sortDirection,
     sortField,
     encodeUrl,
-    onUnauthorized,
+    onUnauthorized
   ]);
-
-  useEffect(() => {
-    if (!logonState) navigate('/logonRegister');
-  }, [logonState, navigate]);
 
   return (
     <>
-      <p>{logonState.userName} is logged on.</p>
-      <button onClick={handleLogoff}>Logoff</button>
-      {logoffError && <p>{logoffError}</p>}
+      <AuthLogoff />
       <hr />
       <TodoForm onAddTodo={addTodo} isSaving={todoState.isSaving} />
 
@@ -253,7 +259,7 @@ function TodosPage({
       {todoState.errorMessage && (
         <div className={styles.errorWrapper}>
           <hr />
-          <p className={styles.errorMessage}>{todoState.errorMessage}</p>
+          <p>{todoState.errorMessage}</p>
           <button
             type="button"
             onClick={() => dispatch({ type: todoActions.clearError })}

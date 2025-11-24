@@ -11,7 +11,7 @@ function AuthLogoff() {
     if (userState && userState.userData) {
       try {
         dispatch({ type: userActions.fetchUser });
-        const res = await fetch(`${urlBase}/user/logoff`, {
+        const res = await fetch(`${urlBase}/api/users/logoff`, {
           method: 'POST',
           headers: {
             'X-CSRF-TOKEN': userState.userData.csrfToken,

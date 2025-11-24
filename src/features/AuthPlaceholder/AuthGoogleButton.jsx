@@ -13,7 +13,7 @@ function AuthGoogleButton() {
     onSuccess: async (codeResponse) => {
       try {
         dispatch({ type: userActions.fetchUser });
-        const res = await fetch(`${urlBase}/user/googleLogon`, {
+        const res = await fetch(`${urlBase}/api/users/googleLogon`, {
           body: JSON.stringify({
             code: codeResponse.code
           }),

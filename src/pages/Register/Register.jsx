@@ -24,7 +24,7 @@ function Register() {
     }
     try {
       dispatch({ type: userActions.fetchUser });
-      const res = await fetch(`${urlBase}/user`, {
+      const res = await fetch(`${urlBase}/api/users`, {
         body: JSON.stringify({
           name,
           email,

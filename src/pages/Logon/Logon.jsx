@@ -16,7 +16,7 @@ function Logon() {
   const handleLogonSubmit = async (email, password) => {
     try {
       dispatch({ type: userActions.fetchUser });
-      const res = await fetch(`${urlBase}/user/logon`, {
+      const res = await fetch(`${urlBase}/api/users/logon`, {
         body: JSON.stringify({
           email,
           password,

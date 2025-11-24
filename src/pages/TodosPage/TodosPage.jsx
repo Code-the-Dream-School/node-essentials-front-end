@@ -109,7 +109,7 @@ function TodosPage() {
       };
 
       // const resp = await fetch(encodeUrl(), options);
-      const resp = await fetch(`${urlBase}/tasks/${editedTodo.id}`, options);
+      const resp = await fetch(`${urlBase}/api/tasks/${editedTodo.id}`, options);
       if (resp.status === 401) {
         return onUnauthorized();
       }
@@ -155,7 +155,7 @@ function TodosPage() {
         body: JSON.stringify(payload),
         credentials: 'include',
       };
-      const resp = await fetch(`${urlBase}/tasks/${id}`, options);
+      const resp = await fetch(`${urlBase}/api/tasks/${id}`, options);
       if (resp.status === 401) {
         return onUnauthorized();
       }
@@ -183,7 +183,7 @@ function TodosPage() {
   //Airtable-specific URL with params
   const encodeUrl = useCallback(() => {
     // const url = `https://api.airtable.com/v0/${import.meta.env.VITE_BASE_ID}/${import.meta.env.VITE_TABLE_NAME}`;
-    const url = `${urlBase}/tasks`;
+    const url = `${urlBase}/api/tasks`;
     let searchQuery = '';
     // let sortQuery = `sort[0][field]=${sortField}&sort[0][direction]=${sortDirection}`;
     let orderby = sortField;

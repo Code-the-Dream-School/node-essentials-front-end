@@ -1,4 +1,4 @@
-import {useSearchParams} from 'react-router';
+import {useSearchParams} from 'react-router-dom';
 import {styled} from 'styled-components';
 
 function TodoPaginationForm({ isLoading, page, setPage, total, limit }) {

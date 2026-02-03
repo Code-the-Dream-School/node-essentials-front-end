@@ -29,5 +29,10 @@ export default ({ mode }) => {
         },
       },
     },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './test/setupTests.js',
+    },
   });
 };

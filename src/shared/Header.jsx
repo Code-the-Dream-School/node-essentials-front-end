@@ -1,7 +1,6 @@
-import { NavLink } from 'react-router';
 import styles from './Header.module.css';
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 
 function Header() {
   const [title, setTitle] = useState('Todo List');

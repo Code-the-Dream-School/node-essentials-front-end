@@ -1,6 +1,5 @@
 import {useCallback, useContext, useEffect, useReducer, useState} from 'react';
-import {useNavigate} from 'react-router-dom';
-import {useSearchParams} from 'react-router';
+import {useNavigate, useSearchParams} from 'react-router-dom';
 import AuthLogoff from '../../features/AuthLogoff/AuthLogoff';
 import TodoForm from '../../features/TodoForm';
 import TodoList from '../../features/TodoList/TodoList';
